@@ -1,81 +1,114 @@
-import pandas as pd
-from sklearn.utils import shuffle
-from torch.utils.data import Dataset, random_split
+
+from torch.utils.data import Dataset, DataLoader
 import pytorch_lightning as pl
-from torch.utils.data import random_split, DataLoader
-from transformers import BertTokenizerFast, BertForNextSentencePrediction
+from transformers import BertTokenizerFast, BertForTokenClassification, BertConfig
 import torch
 from torch import optim
 import pytorch_lightning as pl
+import json
+import os
+
+USE_ZH_PUNCTUATION = [
+    '，',
+    '、',
+    '。',
+    '？',
+    '！',
+    '；',
+]
+
+
+def make_model_config():
+    label2id = {}
+    id2label = {}
+
+    for x_id, x in enumerate(['O'] + USE_ZH_PUNCTUATION):
+        label = f"S-{x}"
+        if x_id == 0:
+            label = "O"
+        label2id[label] = x_id
+        id2label[x_id] = label
+
+    return BertConfig(
+        label2id=label2id,
+        id2label=id2label,
+        num_labels=len(USE_ZH_PUNCTUATION) + 1
+    )
 
 
 def get_tokenizer():
-    return BertTokenizerFast.from_pretrained('bert-base-chinese')
+    tokenizer = BertTokenizerFast.from_pretrained('bert-base-chinese')
+    return tokenizer
 
 
 def get_model():
-    return BertForNextSentencePrediction.from_pretrained('bert-base-chinese')
+    return BertForTokenClassification.from_pretrained('bert-base-chinese', config=make_model_config(), ignore_mismatched_sizes=True)
 
 
-class STCDataset(Dataset):
+class _PunctDataset(Dataset):
     def __init__(self, file_path) -> None:
         super().__init__()
-        self.tokenizer = get_tokenizer()
-
-        df = pd.read_excel(file_path)
-        df_pos = df.loc[df["sum"] >= 0]
-        df_neg = df.loc[df["sum"] < 0]
-        balance_num = min(len(df_pos.index), len(df_neg.index))
-
-        df_pos = shuffle(df_pos)[:balance_num]
-        df_pos['label'] = [0]*balance_num
-
-        df_neg = shuffle(df_neg)[:balance_num]
-        df_neg['label'] = [1]*balance_num
-
-        df_bal = pd.concat([df_pos, df_neg])
-        self.df = df_bal
+        self.data = open(
+            file_path, "r", encoding='utf-8').read().strip().split("\n")
 
     def __getitem__(self, index):
-        data = self.df.iloc[index]
-        encodings = self.tokenizer(
-            data["query"],
-            data["comment"],
-            max_length=120,
-            return_tensors="pt",
-            truncation='only_second',
-            padding='max_length'
-
-        )
-        return (
-            encodings['input_ids'][0],
-            encodings['attention_mask'][0],
-            encodings['token_type_ids'][0],
-            torch.tensor(data["label"])
-        )
+        data = self.data[index]
+        return json.loads(data)
 
     def __len__(self):
-        return len(self.df.index)
+        return len(self.data)
 
 
-class STCDataModule(pl.LightningDataModule):
+class PunctDataset(Dataset):
+    def __init__(self, file_path, window_size=384) -> None:
+        super().__init__()
+        self.tokenizer = get_tokenizer()
+        self.config = make_model_config()
+        self.dataset = _PunctDataset(file_path)
+        self.window_size = window_size
+        self.data = list(self._stride(self.window_size))
+
+    def _stride(self, window_size):
+        step = int(window_size*8)
+        for data_idx in range(len(self.dataset)):
+            data = self.dataset[data_idx]
+            tokens = data['tokens']
+            bios = data['bios']
+            for window_start in range(0, len(tokens), step):
+                window_tokens = tokens[window_start:window_start+window_size]
+                window_bios = bios[window_start:window_start+window_size]
+                yield {
+                    'tokens': window_tokens,
+                    'bios': window_bios
+                }
+
+    def __getitem__(self, index):
+        data = self.data[index]
+        tokens = self.tokenizer.convert_tokens_to_ids(data['tokens'])
+        bios = [self.config.label2id[x] for x in data['bios']]
+        while len(tokens) < self.window_size:
+            tokens.append(self.tokenizer.pad_token_id)
+            bios.append(-100)
+
+        return torch.tensor(tokens), torch.tensor(bios)
+
+    def __len__(self):
+        return len(self.data)
+
+
+class PunctDataModule(pl.LightningDataModule):
     def __init__(self, batch_size=8):
         super().__init__()
         self.batch_size = batch_size
-        dataset = STCDataset("data/STC2_Train_V1.0.xlsx")
-
-        train_set_size = int(len(dataset) * 0.8)
-        valid_set_size = int(len(dataset) * 0.1)
-        test_set_size = len(dataset) - (train_set_size + valid_set_size)
-        train_set, valid_set, test_set = random_split(
-            dataset, [train_set_size, valid_set_size, test_set_size])
-
-        self.train = train_set
-        self.valid = valid_set
-        self.test = test_set
+        self.train = PunctDataset(
+            'data/ZH-Wiki-Punctuation-Restore-Dataset/train.jsonl')
+        self.valid = PunctDataset(
+            'data/ZH-Wiki-Punctuation-Restore-Dataset/dev.jsonl')
+        self.test = PunctDataset(
+            'data/ZH-Wiki-Punctuation-Restore-Dataset/test.jsonl')
 
     def train_dataloader(self):
-        return DataLoader(self.train, batch_size=self.batch_size)
+        return DataLoader(self.train, batch_size=self.batch_size, shuffle=True)
 
     def val_dataloader(self):
         return DataLoader(self.valid, batch_size=self.batch_size)
@@ -84,10 +117,7 @@ class STCDataModule(pl.LightningDataModule):
         return DataLoader(self.test, batch_size=self.batch_size)
 
 
-class BertNSP(pl.LightningModule):
-    # 0 indicates sequence B is a continuation of sequence A,
-    # 1 indicates sequence B is a random sequence.
-
+class BertTC(pl.LightningModule):
     def __init__(self, args):
         super().__init__()
         self.args = args
@@ -99,40 +129,61 @@ class BertNSP(pl.LightningModule):
     def training_step(self, batch, batch_idx):
         encodings = {
             'input_ids': batch[0],
-            'attention_mask': batch[1],
-            'token_type_ids': batch[2],
-            'labels': batch[3]
+            'labels': batch[-1]
         }
         output = self.model(**encodings)
         loss = output['loss']
 
         self.log("train_loss", loss)
+
+        # predicted_token_class_id_batch = output['logits'].argmax(-1)
+        # for predicted_token_class_ids in predicted_token_class_id_batch:
+        #     predicted_tokens_classes = [self.model.config.id2label[t.item()] for t in predicted_token_class_ids]
+        #     predicted_tokens_classe_pred = ' '.join(predicted_tokens_classes)
+        #     print(predicted_tokens_classe_pred)
+
         return loss
 
     def validation_step(self, batch, batch_idx):
         encodings = {
             'input_ids': batch[0],
-            'attention_mask': batch[1],
-            'token_type_ids': batch[2],
-            'labels': batch[3]
+            'labels': batch[-1]
         }
         output = self.model(**encodings)
         loss = output['loss']
 
-        self.log("val_loss", loss)
+        self.log("val_loss", loss, prog_bar=True)
         return loss
 
     def test_step(self, batch, batch_idx):
         encodings = {
             'input_ids': batch[0],
-            'attention_mask': batch[1],
-            'token_type_ids': batch[2],
-            'labels': batch[3]
+            'labels': batch[-1]
         }
         output = self.model(**encodings)
         loss = output['loss']
 
-        self.log("test_loss", loss)
+        with open(os.path.join(self.trainer.log_dir, 'pred.log'), 'a') as f:
+            predicted_token_class_id_batch = output['logits'].argmax(-1)
+            for predicted_token_class_ids, labels in zip(predicted_token_class_id_batch, labels := batch[-1]):
+
+                # compute the pad start in lable
+                # and also truncate the predict
+                labels = labels.tolist()
+                try:
+                    labels_pad_start = labels.index(-100)
+                except:
+                    labels_pad_start = len(labels)
+                labels = labels[:labels_pad_start]
+
+                predicted_tokens_classes = [
+                    self.model.config.id2label[t.item()] for t in predicted_token_class_ids]
+                predicted_tokens_classes = predicted_tokens_classes[:labels_pad_start]
+                predicted_tokens_classe_pred = ' '.join(
+                    predicted_tokens_classes)
+                f.write(f"{predicted_tokens_classe_pred}\n")
+
+        self.log("test_loss", loss, prog_bar=True)
         return loss
 
     def configure_optimizers(self):

@@ -2,3 +2,5 @@
 *__pycache__*
 lightning_logs/
 .vscode/
+.venv/
+data/ZH-Wiki-Punctuation-Restore-Dataset/
