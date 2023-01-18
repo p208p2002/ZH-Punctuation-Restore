@@ -36,9 +36,10 @@ if __name__ == "__main__":
     trainer = Trainer.from_argparse_args(args, callbacks=[val_checkpoint_callback,early_stopping])
     datamodule = PunctDataModule(batch_size=args.batch_size)
 
-    trainer.fit(model, datamodule=datamodule)
-    try:
-        trainer.test(ckpt_path='best', datamodule=datamodule)
-    except:
-        print("best ckpt not found, use the last ckpt")
-        trainer.test(ckpt_path='last', datamodule=datamodule)
+    # trainer.fit(model, datamodule=datamodule)
+    trainer.test(model,ckpt_path='lightning_logs/version_7/checkpoints/val-epoch=epoch=01-setp=step=6103-val_loss=val_loss=0.39.ckpt', datamodule=datamodule)
+    # try:
+        # trainer.test(ckpt_path='best', datamodule=datamodule)
+    # except:
+        # print("best ckpt not found, use the last ckpt")
+        # trainer.test('last', datamodule=datamodule)

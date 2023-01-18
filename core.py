@@ -124,7 +124,7 @@ class BertTC(pl.LightningModule):
         self.save_hyperparameters(self.args)
 
         self.model = get_model()
-        self.tokeizer = get_tokenizer()
+        self.tokenizer = get_tokenizer()
 
     def training_step(self, batch, batch_idx):
         encodings = {
@@ -163,6 +163,7 @@ class BertTC(pl.LightningModule):
         output = self.model(**encodings)
         loss = output['loss']
 
+        tf = open(os.path.join(self.trainer.log_dir, '_test.label'), 'a')
         with open(os.path.join(self.trainer.log_dir, 'pred.log'), 'a') as f:
             predicted_token_class_id_batch = output['logits'].argmax(-1)
             for predicted_token_class_ids, labels in zip(predicted_token_class_id_batch, labels := batch[-1]):
@@ -175,13 +176,18 @@ class BertTC(pl.LightningModule):
                 except:
                     labels_pad_start = len(labels)
                 labels = labels[:labels_pad_start]
-
-                predicted_tokens_classes = [
-                    self.model.config.id2label[t.item()] for t in predicted_token_class_ids]
+                
+                # predicted_token_class_ids
+                predicted_tokens_classes = [self.model.config.id2label[t.item()] for t in predicted_token_class_ids]
                 predicted_tokens_classes = predicted_tokens_classes[:labels_pad_start]
                 predicted_tokens_classe_pred = ' '.join(
                     predicted_tokens_classes)
                 f.write(f"{predicted_tokens_classe_pred}\n")
+
+                # labels
+                labels_tokens_classes = [self.model.config.id2label[t] for t in labels]
+                labels_tokens_classes = ' '.join(labels_tokens_classes)
+                tf.write(f"{labels_tokens_classes}\n")
 
         self.log("test_loss", loss, prog_bar=True)
         return loss
