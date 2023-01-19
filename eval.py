@@ -12,5 +12,7 @@ labels  = [label.split(" ") for label in labels]
 
 preds = open(args.pred_file,'r',encoding='utf-8').read().strip().split("\n")
 preds = [pred.split(" ") for pred in preds]
+print(labels[105])
+print(preds[105])
 
-print(classification_report(labels,preds))
+# print(classification_report([labels[105]],[preds[105]]))

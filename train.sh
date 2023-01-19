@@ -1,2 +1,2 @@
 which python
-$(which python) main.py --batch_size 10 --accelerator gpu --devices 1 --max_epochs 2 -lr 3e-5 --val_check_interval 0.2
+$(which python) main.py --batch_size 16 --accelerator gpu --devices 1 --max_epochs 5 -lr 1e-4 --val_check_interval 0.2
