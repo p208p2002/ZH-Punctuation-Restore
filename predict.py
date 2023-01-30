@@ -35,7 +35,7 @@ class DocumentDataset(Dataset):
     def __len__(self):
         return len(self.data)
     
-def merge_stride(output:int,window_size:int,step:int):
+def merge_stride(output:int,step:int):
     out = []
     for sent_idx,stride_sent in enumerate(output):
         token_idx = step*sent_idx
@@ -45,7 +45,6 @@ def merge_stride(output:int,window_size:int,step:int):
             else:
                 out[token_idx] = token_ner
             token_idx += 1
-        
     return out
     
 def decode_pred(token_ners):
@@ -67,7 +66,7 @@ if __name__ == "__main__":
     model = BertTC.load_from_checkpoint('/user_data/zhp/lightning_logs/version_0/checkpoints/last.ckpt')
     trainer =Trainer()
     model_pred_out = trainer.predict(model,dataloader)
-    merge_pred_result = merge_stride(model_pred_out,window_size,step)
+    merge_pred_result = merge_stride(model_pred_out,step)
     merge_pred_result_deocde = decode_pred(merge_pred_result)
     merge_pred_result_deocde = ''.join(merge_pred_result_deocde)
     print(merge_pred_result_deocde)
