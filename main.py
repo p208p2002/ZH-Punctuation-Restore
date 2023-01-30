@@ -29,7 +29,7 @@ if __name__ == "__main__":
     early_stopping = EarlyStopping(
         'val_loss',
         mode='min',
-        patience=4,
+        patience=5,
         check_on_train_epoch_end=False
     )
 
