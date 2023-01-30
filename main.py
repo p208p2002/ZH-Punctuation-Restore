@@ -20,7 +20,7 @@ if __name__ == "__main__":
 
     val_checkpoint_callback = ModelCheckpoint(
         monitor='val_loss',
-        filename='val-epoch={epoch:02d}-setp={step}-val_loss={val_loss:.2f}',
+        filename='val-epoch={epoch:02d}-setp={step}-val_loss={val_loss:.5f}',
         save_last=True,
         save_on_train_epoch_end=False,
         save_top_k=3

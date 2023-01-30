@@ -29,12 +29,12 @@ def make_model_config():
         label2id[label] = x_id
         id2label[x_id] = label
 
-    return BertConfig(
+    return BertConfig.from_pretrained(
+        'bert-base-chinese',
         label2id=label2id,
         id2label=id2label,
         num_labels=len(USE_ZH_PUNCTUATION) + 1
     )
-
 
 def get_tokenizer():
     tokenizer = BertTokenizerFast.from_pretrained('bert-base-chinese')
@@ -69,7 +69,7 @@ class PunctDataset(Dataset):
         self.data = list(self._stride(self.window_size))
 
     def _stride(self, window_size):
-        step = int(window_size*8)
+        step = int(window_size*0.8)
         for data_idx in range(len(self.dataset)):
             data = self.dataset[data_idx]
             tokens = data['tokens']
@@ -133,14 +133,7 @@ class BertTC(pl.LightningModule):
         }
         output = self.model(**encodings)
         loss = output['loss']
-
         self.log("train_loss", loss)
-
-        # predicted_token_class_id_batch = output['logits'].argmax(-1)
-        # for predicted_token_class_ids in predicted_token_class_id_batch:
-        #     predicted_tokens_classes = [self.model.config.id2label[t.item()] for t in predicted_token_class_ids]
-        #     predicted_tokens_classe_pred = ' '.join(predicted_tokens_classes)
-        #     print(predicted_tokens_classe_pred)
 
         return loss
 
@@ -191,6 +184,36 @@ class BertTC(pl.LightningModule):
 
         self.log("test_loss", loss, prog_bar=True)
         return loss
+
+    def predict_step(self, batch, batch_idx, dataloader_idx=0):
+        assert batch.shape[0]==1
+        out = []
+        input_ids = batch
+        encodings = {'input_ids': input_ids}
+        output = self.model(**encodings)
+
+        predicted_token_class_id_batch = output['logits'].argmax(-1)
+        for predicted_token_class_ids, input_ids in zip(predicted_token_class_id_batch, input_ids):
+            tokens = self.tokenizer.convert_ids_to_tokens(input_ids)
+            
+            # compute the pad start in input_ids
+            # and also truncate the predict
+            input_ids = input_ids.tolist()
+            try:
+                input_id_pad_start = input_ids.index(self.tokenizer.pad_token_id)
+            except:
+                input_id_pad_start = len(input_ids)
+            input_ids = input_ids[:input_id_pad_start]
+            tokens = tokens[:input_id_pad_start]
+    
+            # predicted_token_class_ids
+            predicted_tokens_classes = [self.model.config.id2label[t.item()] for t in predicted_token_class_ids]
+            predicted_tokens_classes = predicted_tokens_classes[:input_id_pad_start]
+
+            for token,ner in zip(tokens,predicted_tokens_classes):
+                out.append((token,ner))
+        return out
+            
 
     def configure_optimizers(self):
         optimizer = optim.Adam(self.parameters(), lr=self.args.learning_rate)
