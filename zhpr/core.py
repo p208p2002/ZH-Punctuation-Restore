@@ -185,36 +185,6 @@ class ZhprBert(pl.LightningModule):
         self.log("test_loss", loss, prog_bar=True)
         return loss
 
-    def predict_step(self, batch, batch_idx, dataloader_idx=0):
-        assert batch.shape[0]==1
-        out = []
-        input_ids = batch
-        encodings = {'input_ids': input_ids}
-        output = self.model(**encodings)
-
-        predicted_token_class_id_batch = output['logits'].argmax(-1)
-        for predicted_token_class_ids, input_ids in zip(predicted_token_class_id_batch, input_ids):
-            tokens = self.tokenizer.convert_ids_to_tokens(input_ids)
-            
-            # compute the pad start in input_ids
-            # and also truncate the predict
-            input_ids = input_ids.tolist()
-            try:
-                input_id_pad_start = input_ids.index(self.tokenizer.pad_token_id)
-            except:
-                input_id_pad_start = len(input_ids)
-            input_ids = input_ids[:input_id_pad_start]
-            tokens = tokens[:input_id_pad_start]
-    
-            # predicted_token_class_ids
-            predicted_tokens_classes = [self.model.config.id2label[t.item()] for t in predicted_token_class_ids]
-            predicted_tokens_classes = predicted_tokens_classes[:input_id_pad_start]
-
-            for token,ner in zip(tokens,predicted_tokens_classes):
-                out.append((token,ner))
-        return out
-            
-
     def configure_optimizers(self):
         optimizer = optim.Adam(self.parameters(), lr=self.args.learning_rate)
         return optimizer
