@@ -1,5 +1,5 @@
 [tool.poetry]
-name = "nsp-stc"
+name = "zhpr"
 version = "0.1.0"
 description = ""
 authors = ["Philip Huang <p208p2002@gmail.com>"]
