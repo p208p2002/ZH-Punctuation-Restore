@@ -117,7 +117,7 @@ class PunctDataModule(pl.LightningDataModule):
         return DataLoader(self.test, batch_size=self.batch_size)
 
 
-class BertTC(pl.LightningModule):
+class ZhprBert(pl.LightningModule):
     def __init__(self, args):
         super().__init__()
         self.args = args

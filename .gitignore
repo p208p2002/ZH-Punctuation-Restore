@@ -6,3 +6,5 @@ lightning_logs/
 data/ZH-Wiki-Punctuation-Restore-Dataset/
 _test.label
 pred.log
+hf_model/
+model.zip

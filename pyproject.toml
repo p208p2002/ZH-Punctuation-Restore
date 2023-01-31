@@ -4,6 +4,7 @@ version = "0.1.0"
 description = ""
 authors = ["Philip Huang <p208p2002@gmail.com>"]
 readme = "README.md"
+packages = [{include = "zhpr"}]
 
 [tool.poetry.dependencies]
 python = "^3.8"

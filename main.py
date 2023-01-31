@@ -1,7 +1,7 @@
 from pytorch_lightning.callbacks import ModelCheckpoint,EarlyStopping
 from argparse import ArgumentParser
 from pytorch_lightning import Trainer
-from core import BertTC,PunctDataModule
+from zhpr.core import ZhprBert,PunctDataModule
 
 if __name__ == "__main__":
     parser = ArgumentParser()
@@ -9,7 +9,7 @@ if __name__ == "__main__":
     parser.add_argument('--learning_rate', '-lr', type=float, default=3e-5)
     parser.add_argument('--batch_size', '-bs', type=int, default=8)
     args = parser.parse_args()
-    model = BertTC(args)
+    model = ZhprBert(args)
 
     best_checkpoint_callback = ModelCheckpoint(
         monitor='val_loss',

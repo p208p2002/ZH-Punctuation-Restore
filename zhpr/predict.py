@@ -1,8 +1,6 @@
-from core import BertTC
 import torch
-from torch.utils.data import Dataset,DataLoader
-from core import get_tokenizer,make_model_config
-from pytorch_lightning import Trainer
+from torch.utils.data import Dataset
+from .core import get_tokenizer,make_model_config
 
 class DocumentDataset(Dataset):
     def __init__(self, document:str, window_size=384,step=307) -> None:
@@ -19,7 +17,6 @@ class DocumentDataset(Dataset):
         tokens = list(self.document)
         for window_start in range(0, len(tokens), self.step):
             window_tokens = tokens[window_start:window_start+window_size]
-            print(window_tokens)
             yield {
                 'tokens': window_tokens,
             }
@@ -54,23 +51,5 @@ def decode_pred(token_ners):
         if token_ner[-1] != 'O':
             out.append(token_ner[-1][-1])
     return out
-
-if __name__ == "__main__":
-    window_size = 100
-    step = 75
-
-    text = "維基百科是維基媒體基金會運營的一個多語言的線上百科全書並以建立和維護作為開放式協同合作專案特點是自由內容自由編輯自由著作權目前是全球網路上最大且最受大眾歡迎的參考工具書名列全球二十大最受歡迎的網站其在搜尋引擎中排名亦較為靠前維基百科目前由非營利組織維基媒體基金會負責營運"
-    dataset = DocumentDataset(text,window_size=window_size,step=step)
-    dataloader = DataLoader(dataset=dataset,shuffle=False,batch_size=1)
-
-    model = BertTC.load_from_checkpoint('/user_data/zhp/lightning_logs/version_0/checkpoints/last.ckpt')
-    trainer =Trainer()
-    model_pred_out = trainer.predict(model,dataloader)
-    merge_pred_result = merge_stride(model_pred_out,step)
-    merge_pred_result_deocde = decode_pred(merge_pred_result)
-    merge_pred_result_deocde = ''.join(merge_pred_result_deocde)
-    print(merge_pred_result_deocde)
-
-    
 
 

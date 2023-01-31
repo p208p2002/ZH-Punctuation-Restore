@@ -1,16 +1,3 @@
-# 中文標點符號標注
-訓練資料集: [p208p2002/ZH-Wiki-Punctuation-Restore-Dataset](https://github.com/p208p2002/ZH-Wiki-Punctuation-Restore-Dataset)
-
-共計支援6種標點符號: ， 、 。 ？ ！ ； 
-
-## 安裝
-```bash
-# pip install torch pytorch-lightning
-pip install zhpr
-```
-
-## 使用
-```python
 from zhpr.predict import DocumentDataset,merge_stride,decode_pred
 from transformers import AutoModelForTokenClassification,AutoTokenizer
 from torch.utils.data import DataLoader
@@ -62,7 +49,5 @@ if __name__ == "__main__":
     merge_pred_result_deocde = decode_pred(merge_pred_result)
     merge_pred_result_deocde = ''.join(merge_pred_result_deocde)
     print(merge_pred_result_deocde)
-```
-```
-維基百科是維基媒體基金會運營的一個多語言的線上百科全書，並以建立和維護作為開放式協同合作。專案特點是自由內容、自由編輯、自由著作權。目前是全球網路上最大且最受大眾歡迎的參考工具書，名列全球二十大最受歡迎的網站。其在眾歡迎的參考工具書，名列全球二十大最受歡迎的網站，其在搜尋引擎中排名亦較為靠前。維基百科目前由非營利組織維基媒體基金會負責營運。
-```
+
+    
